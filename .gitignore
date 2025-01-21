@@ -170,3 +170,5 @@ logs/
 results/
 
 runs/
+
+tmp*
