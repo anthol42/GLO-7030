@@ -1,0 +1,13 @@
+matplotlib
+numpy<2.0.0
+Pillow
+PyYAML
+scikit-learn
+scipy
+torch
+torchvision
+pandas
+torchinfo
+tensorboard
+antho-utils
+torchmetrics
