@@ -1,31 +1,146 @@
+import os.path
+
+import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torchvision import datasets
-from torchvision.transforms import ToTensor
+import pandas as pd
+from pyutils import ConfigFile
+import numpy as np
+from typing import *
+import tiktoken
 
+def split_dataset(config: ConfigFile, train_size: float = 0.8):
+    if config["seed"] is not None:
+        np.random.seed(config["seed"])
+        seed = config["seed"]
+    else:
+        seed = None
 
-def make_dataset(config):
-    training_data = datasets.MNIST(
-        root="data",
-        train=True,
-        download=True,
-        transform=ToTensor()
-    )
+    df = pd.read_csv("data/ruddit_comments_score.csv")
 
-    test_data = datasets.MNIST(
-        root="data",
-        train=False,
-        download=True,
-        transform=ToTensor()
-    )
-    return training_data, test_data
+    # Filter deleted
+    df = df.loc[df["body"] != "[deleted]"]
+    df = df.loc[df["body"] != "[removed]"]
 
-def make_dataloader(config):
-    train_ds, test_ds = make_dataset(config)
-    train_dataloader = DataLoader(train_ds, batch_size=config["data"]["batch_size"], shuffle=config["data"]["shuffle"])
-    test_dataloader = DataLoader(test_ds,
-                                 batch_size=config["data"]["batch_size"], shuffle=False)
-    return train_dataloader, test_dataloader, test_dataloader
+    train = df.sample(frac=train_size, random_state=seed)
+    test = df.drop(index=train.index)
+
+    train.to_csv("data/train.csv")
+    test.to_csv("data/test.csv")
+
+class TextDataset(Dataset):
+    def __init__(self, data, config):
+        self.data = data
+        self.config = config
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        row = self.data.iloc[idx]
+        comment = row["body"]
+        label = row["score"]
+        return comment, torch.tensor(label)
+
+class TextCollator:
+    def __init__(self, max_len: int = 1024):
+        self.max_len = max_len
+        self.tokenizer = tiktoken.get_encoding("gpt2")
+
+    def prep_tensors(self, B, L):
+        tokens = torch.zeros((B, L), dtype=torch.int64) # We add 1 because of the <bos> token, aka <cls>
+        tokens.fill_(-1)
+        true_toks = torch.zeros((B, L), dtype=torch.int64)
+        true_toks.fill_(-1)
+
+        return tokens, true_toks
+
+    def __call__(self, raw_batch: Sequence[Tuple[str, torch.Tensor]]) -> \
+            Tuple[List[str], torch.Tensor, torch.Tensor]:
+        """
+        Called by the dataloader to collate a batch of data.
+        :param raw_batch: The raw batch of data
+        :return: A list of the raw sequences, the tokenized ground truth, the tokenized input and the label
+        """
+        B = len(raw_batch)
+        L = self.max_len
+        texts, labels = zip(*raw_batch)
+        texts = [text[:L] for text in texts]
+        L = max([len(text) for text in texts])
+
+        # Tokenize
+        toks = [torch.tensor(self.tokenizer.encode(text)) for text in texts]
+
+        # Prepare the tensors
+        tokens, true_toks = self.prep_tensors(B, L)
+        targets = torch.tensor(labels).unsqueeze(1)
+
+        # Fill the tensors
+        for i, tok in enumerate(toks):
+            tokens[i, :len(tok)] = tok
+            tokens[i, len(tok)] = torch.tensor(50256, dtype=torch.int64) # End of text token : print(enc.encode("<|endoftext|>", allowed_special={"<|endoftext|>"}))
+
+        return texts, tokens, targets
+
+def make_dataloaders(config: ConfigFile):
+    if not os.path.exists("data/train.csv") or not os.path.exists("data/test.csv"):
+        split_dataset(config)
+
+    if config["seed"] is not None:
+        np.random.seed(config["seed"])
+        seed = config["seed"]
+    else:
+        seed = None
+    train_data = pd.read_csv("data/train.csv", index_col=0)
+    train_data = train_data.sample(frac=0.9, random_state=seed)
+    valid_data = train_data.drop(index=train_data.index)
+    test_data = pd.read_csv("data/test.csv", index_col=0)
+
+    train = TextDataset(train_data, config)
+    valid = TextDataset(valid_data, config)
+    test = TextDataset(test_data, config)
+
+    collator = TextCollator()
+    num_workers = config["data"]["num_workers"]
+    train_dl = DataLoader(train, batch_size=config["data"]["batch_size"], collate_fn=collator,
+                          num_workers=num_workers, persistent_workers=num_workers > 0,
+                          shuffle=config["data"]["shuffle"])
+    val_dl = DataLoader(valid, batch_size=config["data"]["batch_size"], collate_fn=collator,
+                          num_workers=num_workers, persistent_workers=num_workers > 0,
+                          shuffle=False)
+    test_dl = DataLoader(test, batch_size=config["data"]["batch_size"], collate_fn=collator,
+                          num_workers=num_workers, persistent_workers=num_workers > 0,
+                          shuffle=False)
+
+    return train_dl, val_dl, test_dl
 
 if __name__ == "__main__":
-    import pandas
+    import pandas as pd
+    split_dataset({"seed": 42}, 0.8)
+
+    ds = TextDataset({"seed": 42}, "data/train.csv")
+    # lengths = pd.read_csv("data/train.csv", index_col=0)["body"].str.len()
+    # plt.hist(lengths.values)
+    # plt.show()
+    cfg = {
+        "seed": 42,
+        "data":{
+            "batch_size": 64,
+            "shuffle": True,
+            "num_workers": 2
+        }
+    }
+    train_dl, val_dl, test_dl = make_dataloaders(config=cfg)
+    for text, tokens, target in train_dl:
+        print(text)
+        print(tokens)
+        print(target)
+        break
+    # df = pd.read_csv("data/ruddit_comments_score.csv")
+    #
+    # # Filter deleted
+    # df = df.loc[df["body"] != "[deleted]"]
+    # for i, row in df.sample(frac=0.05).iterrows():
+    #     print(row["score"])
+    #     print(row["body"])
+    #     print("-" * 100)
