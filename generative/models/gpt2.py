@@ -28,6 +28,7 @@ class CausalSelfAttention(nn.Module):
                              .view(1, 1, config['block_size'], config['block_size']))
 
     def forward(self, x):
+        # TODO: Add padding mask: maybe this as an example: https://stats.stackexchange.com/questions/598239/how-is-padding-masking-considered-in-the-attention-head-of-a-transformer
         B, T, C = x.size()
 
         qkv = self.c_attn(x)
@@ -87,6 +88,7 @@ class GPT(nn.Module):
     def forward(self, idx, tox):
         B, T = idx.size()
         assert T <= self.config["block_size"], f"Cannot forward a text {T} bigger than blocksize {self.config['block_size']}"
+        # TODO: Add normalization by padding mask. Like ESM
 
         pos = torch.arange(0, T + 1, dtype=torch.long, device=idx.device)
         pos_emb = self.transformer.wpe(pos) # Shape(T, n_emb)
