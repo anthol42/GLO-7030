@@ -28,9 +28,4 @@ def make_dataloader(config):
     return train_dataloader, test_dataloader, test_dataloader
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-
-    train, test = make_dataset({})
-    img, label = train[0]
-    plt.imshow(img.squeeze(0))
-    plt.show()
+    import pandas

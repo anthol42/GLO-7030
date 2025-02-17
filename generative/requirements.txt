@@ -11,3 +11,4 @@ torchinfo
 tensorboard
 antho-utils
 torchmetrics
+transformers
