@@ -43,7 +43,7 @@ class TextDataset(Dataset):
         return comment, torch.tensor(label)
 
 class TextCollator:
-    def __init__(self, max_len: int = 1024):
+    def __init__(self, max_len: int = 256):
         self.max_len = max_len
         self.tokenizer = tiktoken.get_encoding("gpt2")
 
@@ -63,13 +63,11 @@ class TextCollator:
         :return: A list of the raw sequences, the tokenized ground truth, the tokenized input and the label
         """
         B = len(raw_batch)
-        L = self.max_len
         texts, labels = zip(*raw_batch)
-        texts = [text[:L] for text in texts]
-        L = max([len(text) for text in texts])
 
         # Tokenize
-        toks = [torch.tensor(self.tokenizer.encode(text)) for text in texts]
+        toks = [torch.tensor(self.tokenizer.encode(text)[:self.max_len - 1]) for text in texts]
+        L = max([len(tok) for tok in toks]) + 1
 
         # Prepare the tensors
         tokens, targets = self.prep_tensors(B, L)
@@ -101,7 +99,7 @@ def make_dataloaders(config: ConfigFile):
     valid = TextDataset(valid_data, config)
     test = TextDataset(test_data, config)
 
-    collator = TextCollator()
+    collator = TextCollator(max_len=config["data"]["context_len"])
     num_workers = config["data"]["num_workers"]
     train_dl = DataLoader(train, batch_size=config["data"]["batch_size"], collate_fn=collator,
                           num_workers=num_workers, persistent_workers=num_workers > 0,

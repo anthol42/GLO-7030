@@ -13,6 +13,7 @@ from utils.bin import *
 from torchmetrics import Accuracy
 from torchinfo import summary
 from torch.optim.lr_scheduler import CosineAnnealingLR
+import time
 
 # To verify if the config has the good format
 from configs.formats import config_format
@@ -60,7 +61,7 @@ def experiment1(args, kwargs):
     # Loading the model
     model = GPT.from_pretrained("gpt2")
     if args.verbose >= 3:
-        summary(model, input_data=(torch.randint(0, 128, size=(config["data"]["batch_size"], 128)), torch.randn(config["data"]["batch_size"], 1)))
+        summary(model, input_data=(torch.randint(0, 128, size=(config["data"]["batch_size"], 256)), torch.randn(config["data"]["batch_size"], 1)))
     model.to(device)
     log("Model loaded successfully!")
 

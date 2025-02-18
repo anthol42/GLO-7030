@@ -4,6 +4,7 @@ from pyutils import progress
 from utils import State, DynamicMetric, format_metrics
 from typing import *
 from utils.bin import *
+import time
 
 def train_one_epoch(dataloader, model, optimizer, criterion, epoch, device, scheduler=None, scaler=None,
                     metrics: dict = None, sample_inputs: Optional[str] = None):

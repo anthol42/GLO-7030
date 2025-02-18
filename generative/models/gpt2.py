@@ -94,7 +94,7 @@ class GPT(nn.Module):
     def forward(self, idx, tox):
         B, T = idx.size()
         assert T <= self.config["block_size"], f"Cannot forward a text {T} bigger than blocksize {self.config['block_size']}"
-        pad_mask = torch.cat((torch.zeros((B, 1)), idx == -1), dim=1)   # -1 is Padding idx
+        pad_mask = torch.cat((torch.zeros((B, 1), device=idx.device), idx == -1), dim=1)   # -1 is Padding idx
         # To avoid out of bounds error in embeddings
         idx[idx == -1] = 0
         pos = torch.arange(0, T + 1, dtype=torch.long, device=idx.device)
