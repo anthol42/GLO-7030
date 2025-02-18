@@ -56,7 +56,7 @@ class TextCollator:
         return tokens, true_toks
 
     def __call__(self, raw_batch: Sequence[Tuple[str, torch.Tensor]]) -> \
-            Tuple[List[str], torch.Tensor, torch.Tensor]:
+            Tuple[List[str], torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Called by the dataloader to collate a batch of data.
         :param raw_batch: The raw batch of data
@@ -72,15 +72,16 @@ class TextCollator:
         toks = [torch.tensor(self.tokenizer.encode(text)) for text in texts]
 
         # Prepare the tensors
-        tokens, true_toks = self.prep_tensors(B, L)
-        targets = torch.tensor(labels).unsqueeze(1)
+        tokens, targets = self.prep_tensors(B, L)
+        scores = torch.tensor(labels).unsqueeze(1)
 
         # Fill the tensors
         for i, tok in enumerate(toks):
             tokens[i, :len(tok)] = tok
-            tokens[i, len(tok)] = torch.tensor(50256, dtype=torch.int64) # End of text token : print(enc.encode("<|endoftext|>", allowed_special={"<|endoftext|>"}))
+            targets[i, :len(tok)] = tok
+            targets[i, len(tok)] = torch.tensor(50256, dtype=torch.int64) # End of text token : print(enc.encode("<|endoftext|>", allowed_special={"<|endoftext|>"}))
 
-        return texts, tokens, targets
+        return texts, tokens, scores, targets
 
 def make_dataloaders(config: ConfigFile):
     if not os.path.exists("data/train.csv") or not os.path.exists("data/test.csv"):

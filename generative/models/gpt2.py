@@ -5,6 +5,7 @@ from torch import nn
 from torch.nn import functional as F
 from pyutils import ConfigFile
 import matplotlib.pyplot as plt
+from utils.bin import *
 # ---------------------------------------------------------------------------------------------------------------------
 
 @dataclass
@@ -83,7 +84,7 @@ class GPT(nn.Module):
         self.config = config
         self.tox_projector = nn.Linear(1, config["n_embd"])
         self.transformer = nn.ModuleDict(dict(
-            wte=nn.Embedding(config["vocab_size"], config["n_embd"]),
+            wte=nn.Embedding(config["vocab_size"], config["n_embd"], padding_idx=-1),
             wpe=nn.Embedding(config["block_size"], config["n_embd"]),
             h=nn.ModuleList([Block(config) for _ in range(config["n_layer"])]),
             ln_f=nn.LayerNorm(config["n_embd"])
@@ -94,6 +95,8 @@ class GPT(nn.Module):
         B, T = idx.size()
         assert T <= self.config["block_size"], f"Cannot forward a text {T} bigger than blocksize {self.config['block_size']}"
         pad_mask = torch.cat((torch.zeros((B, 1)), idx == -1), dim=1)   # -1 is Padding idx
+        # To avoid out of bounds error in embeddings
+        idx[idx == -1] = 0
         pos = torch.arange(0, T + 1, dtype=torch.long, device=idx.device)
         pos_emb = self.transformer.wpe(pos) # Shape(T, n_emb)
         tok_emb = self.transformer.wte(idx) # Shape(B, T, n_emb)
@@ -135,7 +138,7 @@ class GPT(nn.Module):
         # only dropout can be overridden see more notes below
         assert all(k == 'dropout' for k in override_args)
         from transformers import GPT2LMHeadModel
-        print("loading weights from pretrained gpt: %s" % model_type)
+        log("loading weights from pretrained gpt: %s" % model_type)
 
         # n_layer, n_head and n_embd are determined from model_type
         config = {
@@ -146,7 +149,7 @@ class GPT(nn.Module):
         }[model_type]
         # we can override the dropout rate, if desired
         if 'dropout' in override_args:
-            print(f"overriding dropout rate to {override_args['dropout']}")
+            log(f"overriding dropout rate to {override_args['dropout']}")
             config['dropout'] = override_args['dropout']
         # create a from-scratch initialized minGPT model
         model = GPT(config)

@@ -1,22 +1,18 @@
 config_format = {
     "data":{
         "batch_size": int,
-        "shuffle": bool
+        "shuffle": bool,
+        "num_workers": int
     },
     "training":{
         "num_epochs": int,
-        "learning_rate": float,
+        "lr": float,
+        "min_lr": float,
         "weight_decay": float,
     },
     "model":{
         "model_dir": "opath",
-        "name": "opath",
-        "dropout2d": float,
-        "dropout": float
+        "name": "opath"
     },
-    "scheduler":{
-        "n_iter_restart": int,
-        "factor_increase": int,
-        "min_lr": float
-    },
+    "seed": int
 }

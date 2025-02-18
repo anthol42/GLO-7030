@@ -1,8 +1,8 @@
 import torch
 from torch.utils.tensorboard import SummaryWriter
 import os
-from data import make_dataloader
-from models import Classifier
+from data import make_dataloaders
+from models import GPT
 from training.train import train, evaluate
 import sys
 import shutil
@@ -12,13 +12,12 @@ from pyutils import ConfigFile
 from utils.bin import *
 from torchmetrics import Accuracy
 from torchinfo import summary
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 # To verify if the config has the good format
 from configs.formats import config_format
 
 metrics = {
-    "accuracy": Accuracy(task="multiclass", num_classes=10),
 }
 
 
@@ -55,23 +54,22 @@ def experiment1(args, kwargs):
         shutil.rmtree(f'runs/{run_id}')
     State.writer = SummaryWriter(log_dir=f'runs/{run_id}', comment=comment)
     # Loading the data
-    train_loader, val_loader, test_loader = make_dataloader(config=config)
+    train_loader, val_loader, test_loader = make_dataloaders(config=config)
     log("Data loaded successfully!")
 
     # Loading the model
-    model = Classifier(config)
-    model.to(device)
+    model = GPT.from_pretrained("gpt2")
     if args.verbose >= 3:
-        summary(model, input_size=(config["data"]["batch_size"], 1, 28, 28), device=device)
+        summary(model, input_data=(torch.randint(0, 128, size=(config["data"]["batch_size"], 128)), torch.randn(config["data"]["batch_size"], 1)))
+    model.to(device)
     log("Model loaded successfully!")
 
     # Loading optimizer, loss and scheduler
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=config["training"]["learning_rate"],
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=config["training"]["lr"],
         weight_decay=config["training"]["weight_decay"])
     loss = torch.nn.CrossEntropyLoss()
-    scheduler = CosineAnnealingWarmRestarts(optimizer, config["scheduler"]["n_iter_restart"],
-                                       config["scheduler"]["factor_increase"], eta_min=config["scheduler"]["min_lr"])
+    scheduler = CosineAnnealingLR(optimizer, config["training"]["num_epochs"] * len(train_loader), eta_min=config["training"]["min_lr"])
 
     # Training
     # Prepare the path of input sampling if flag is set
@@ -131,7 +129,7 @@ def experiment1(args, kwargs):
 
     # Save results
     if not DEBUG:
-        resultSocket.write(accuracy=results["accuracy"], crossEntropy=results["loss"])
+        resultSocket.write(loss=results["loss"])
         rtable.toTxt()
 
 

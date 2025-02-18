@@ -15,25 +15,25 @@ def train_one_epoch(dataloader, model, optimizer, criterion, epoch, device, sche
     for m in metrics.values():
         m.reset()
     prg: progress
-    for i, prg, (X, y) in progress(dataloader, type="dl").enum().ref():
+    for i, prg, (text, X, scores, y) in progress(dataloader, type="dl").enum().ref():
         if epoch == 0 and i == 0 and sample_inputs is not None:
             print()
             log(f"Saving sample inputs at {sample_inputs}")
-            torch.save((X, y), sample_inputs)
+            torch.save((text, X, scores, y), sample_inputs)
         # Setup - Copying to gpu if available
-        X, y = X.to(device), y.to(device)
+        X, scores, y = X.to(device), scores.to(device).float(), y.to(device)
         # for i in range(10_000):
         optimizer.zero_grad()
         # Training with possibility of mixed precision
         if scaler:
             with torch.autocast(device_type=str(device), dtype=torch.float16):
-                pred = model(X)
+                pred = model(X, scores)
                 loss = criterion(pred, y)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
-            pred = model(X)
+            pred = model(X, scores)
             loss = criterion(pred, y)
             loss.backward()
             optimizer.step()
@@ -81,12 +81,12 @@ def validation_step(model, dataloader, criterion, epoch, device, metrics: dict =
     for m in metrics.values():
         m.reset()
 
-    for X, y in dataloader:
+    for text, X, scores, y in dataloader:
         # Setup - Copying to gpu if available
-        X, y = X.to(device), y.to(device)
+        X, scores, y = X.to(device), scores.to(device).float(), y.to(device)
 
         # Evaluating
-        pred = model(X)
+        pred = model(X, scores)
         loss = criterion(pred, y)
 
         # Calculate metrics
@@ -154,12 +154,12 @@ def evaluate(model, dataloader, criterion, device, metrics: dict = None):
         m.reset()
 
     output_rate = 25 if str(device) == 'cuda' else 1
-    for prg, (X, y) in progress(dataloader, type="dl", desc="Evaluating", end="\n").ref():
+    for prg, (text, X, scores, y) in progress(dataloader, type="dl", desc="Evaluating", end="\n").ref():
         # Setup - Copying to gpu if available
-        X, y = X.to(device), y.to(device)
+        X, scores, y = X.to(device), scores.to(device).float(), y.to(device)
 
         # Evaluating
-        pred = model(X)
+        pred = model(X, scores)
         loss = criterion(pred, y)
 
         # Calculate metrics
