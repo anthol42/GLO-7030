@@ -50,10 +50,10 @@ class TextCollator:
     def prep_tensors(self, B, L):
         tokens = torch.zeros((B, L), dtype=torch.int64) # We add 1 because of the <bos> token, aka <cls>
         tokens.fill_(-1)
-        true_toks = torch.zeros((B, L), dtype=torch.int64)
-        true_toks.fill_(-1)
+        targets = torch.zeros((B, L + 1), dtype=torch.int64)
+        targets.fill_(-1)
 
-        return tokens, true_toks
+        return tokens, targets
 
     def __call__(self, raw_batch: Sequence[Tuple[str, torch.Tensor]]) -> \
             Tuple[List[str], torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -67,7 +67,7 @@ class TextCollator:
 
         # Tokenize
         toks = [torch.tensor(self.tokenizer.encode(text)[:self.max_len - 1]) for text in texts]
-        L = max([len(tok) for tok in toks]) + 1
+        L = max([len(tok) for tok in toks])
 
         # Prepare the tensors
         tokens, targets = self.prep_tensors(B, L)
@@ -90,9 +90,9 @@ def make_dataloaders(config: ConfigFile):
         seed = config["seed"]
     else:
         seed = None
-    train_data = pd.read_csv("data/train.csv", index_col=0)
-    train_data = train_data.sample(frac=0.9, random_state=seed)
-    valid_data = train_data.drop(index=train_data.index)
+    data = pd.read_csv("data/train.csv", index_col=0)
+    train_data = data.sample(frac=0.9, random_state=seed)
+    valid_data = data.drop(index=train_data.index)
     test_data = pd.read_csv("data/test.csv", index_col=0)
 
     train = TextDataset(train_data, config)

@@ -1,6 +1,7 @@
 import math
 from dataclasses import dataclass
 import torch
+from sympy.printing.tree import print_node
 from torch import nn
 from torch.nn import functional as F
 from pyutils import ConfigFile
@@ -42,13 +43,10 @@ class CausalSelfAttention(nn.Module):
 
         att = (q @ k.transpose(-2, -1)) * (math.sqrt(k.size(-1))**-1)   # Shape(B, nh, T, T)
 
-        mask = torch.logical_or(self.bias[:, :, :T, :T] == 0, pad_mask.unsqueeze(1).unsqueeze(3))
-
-        att = att.masked_fill(mask, float("-inf"))
+        att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float("-inf"))
         att = F.softmax(att, dim=-1)
         y = att @ v
         y = y.transpose(1, 2).contiguous().view(B, T, C)
-
         y = self.c_proj(y)
         return y
 
@@ -94,7 +92,7 @@ class GPT(nn.Module):
     def forward(self, idx, tox):
         B, T = idx.size()
         assert T <= self.config["block_size"], f"Cannot forward a text {T} bigger than blocksize {self.config['block_size']}"
-        pad_mask = torch.cat((torch.zeros((B, 1), device=idx.device), idx == -1), dim=1)   # -1 is Padding idx
+        pad_mask = None # torch.cat((torch.zeros((B, 1), device=idx.device), idx == -1), dim=1)   # -1 is Padding idx
         # To avoid out of bounds error in embeddings
         idx[idx == -1] = 0
         pos = torch.arange(0, T + 1, dtype=torch.long, device=idx.device)

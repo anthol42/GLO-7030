@@ -4,9 +4,10 @@ from pyutils import progress
 from utils import State, DynamicMetric, format_metrics
 from typing import *
 from utils.bin import *
+import torch.nn.functional as F
 import time
 
-def train_one_epoch(dataloader, model, optimizer, criterion, epoch, device, scheduler=None, scaler=None,
+def train_one_epoch(dataloader, model, optimizer, epoch, device, scheduler=None, scaler=None,
                     metrics: dict = None, sample_inputs: Optional[str] = None):
     if metrics is None:
         metrics = {}
@@ -28,14 +29,14 @@ def train_one_epoch(dataloader, model, optimizer, criterion, epoch, device, sche
         # Training with possibility of mixed precision
         if scaler:
             with torch.autocast(device_type=str(device), dtype=torch.float16):
-                pred = model(X, scores)
-                loss = criterion(pred, y)
+                logits = model(X, scores)
+                loss = F.cross_entropy(logits.view(-1, logits.size(-1)), y.view(-1), ignore_index=-1)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
-            pred = model(X, scores)
-            loss = criterion(pred, y)
+            logits = model(X, scores)
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), y.view(-1), ignore_index=-1)
             loss.backward()
             optimizer.step()
 
@@ -47,7 +48,7 @@ def train_one_epoch(dataloader, model, optimizer, criterion, epoch, device, sche
         # Calculate metrics
         metr = {}
         targets = y.detach().cpu()
-        pred = pred.detach().cpu()
+        pred = logits.detach().cpu()
         for metric_name, metric_fn in metrics.items():
             # print(targets.shape, pred.shape)
             metr[metric_name] = metric_fn(pred, targets)
@@ -73,7 +74,7 @@ def train_one_epoch(dataloader, model, optimizer, criterion, epoch, device, sche
     State.writer.add_scalar(f'Train/Loss', lossCounter.compute(), epoch)
 
 @torch.inference_mode()
-def validation_step(model, dataloader, criterion, epoch, device, metrics: dict = None, verbose: bool = True):
+def validation_step(model, dataloader, epoch, device, metrics: dict = None, verbose: bool = True):
     if metrics is None:
         metrics = {}
     model.eval()
@@ -81,18 +82,17 @@ def validation_step(model, dataloader, criterion, epoch, device, metrics: dict =
     # Reset metrics
     for m in metrics.values():
         m.reset()
-
     for text, X, scores, y in dataloader:
         # Setup - Copying to gpu if available
         X, scores, y = X.to(device), scores.to(device).float(), y.to(device)
 
         # Evaluating
-        pred = model(X, scores)
-        loss = criterion(pred, y)
+        logits = model(X, scores)
+        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), y.view(-1), ignore_index=-1)
 
         # Calculate metrics
         targets = y.detach().cpu()
-        pred = pred.detach().cpu()
+        pred = logits.detach().cpu()
         if metrics is not None:
             for metric_name, metric_fn in metrics.items():
                 metric_fn(pred, targets)
@@ -113,8 +113,8 @@ def validation_step(model, dataloader, criterion, epoch, device, metrics: dict =
     last_valid["loss"] = lossCounter.compute()
     State.last_valid = last_valid
 
-def train(model, optimizer, train_loader, val_loader, criterion, num_epochs, device, config, scheduler=None,
-          metrics: dict = None, noscaler: bool = False, watch: str = "accuracy", sample_inputs: Optional[str] = None,
+def train(model, optimizer, train_loader, val_loader, num_epochs, device, config, scheduler=None,
+          metrics: dict = None, noscaler: bool = False, watch: str = "loss", sample_inputs: Optional[str] = None,
           verbose: int = 3):
     State.global_step = 0
     # Checkpoints
@@ -135,17 +135,17 @@ def train(model, optimizer, train_loader, val_loader, criterion, num_epochs, dev
 
         # Train the epoch and validate
         train_one_epoch(
-            train_loader, model, optimizer, criterion, epoch, device, scheduler, scaler, metrics, sample_inputs=sample_inputs
+            train_loader, model, optimizer, epoch, device, scheduler, scaler, metrics, sample_inputs=sample_inputs
         )
         validation_step(
-            model, val_loader, criterion, epoch, device, metrics, verbose == 3
+            model, val_loader, epoch, device, metrics, verbose == 3
         )
 
         # Checkpoint
-        save_best_model(State.last_valid[watch], epoch, model, optimizer, criterion)
+        save_best_model(State.last_valid[watch], epoch, model, optimizer)
 
 @torch.inference_mode()
-def evaluate(model, dataloader, criterion, device, metrics: dict = None):
+def evaluate(model, dataloader, device, metrics: dict = None):
     if metrics is None:
         metrics = {}
     model.eval()
@@ -160,12 +160,12 @@ def evaluate(model, dataloader, criterion, device, metrics: dict = None):
         X, scores, y = X.to(device), scores.to(device).float(), y.to(device)
 
         # Evaluating
-        pred = model(X, scores)
-        loss = criterion(pred, y)
+        logits = model(X, scores)
+        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), y.view(-1), ignore_index=-1)
 
         # Calculate metrics
         targets = y.detach().cpu()
-        pred = pred.detach().cpu()
+        pred = logits.detach().cpu()
         for metric_name, metric_fn in metrics.items():
             metric_fn(pred, targets)
 

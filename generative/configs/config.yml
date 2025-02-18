@@ -11,4 +11,10 @@ training:
 model:
   model_dir: "saved_models/classifier"
   name: "GPT2"
+freezer:
+  transformer: 0.
+  embeddings: false
+  pos: false
+  lm_head: false
+  ln_f: false
 seed: 42

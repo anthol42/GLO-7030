@@ -15,5 +15,12 @@ config_format = {
         "model_dir": "opath",
         "name": "opath"
     },
+    "freezer": {
+        "transformer": float,
+        "embeddings": bool,
+        "pos": bool,
+        "lm_head": bool,
+        "ln_f": bool
+    },
     "seed": int
 }

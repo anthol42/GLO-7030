@@ -60,6 +60,13 @@ def experiment1(args, kwargs):
 
     # Loading the model
     model = GPT.from_pretrained("gpt2")
+    model.freeze(
+        transformer=config["freezer"]["transformer"],
+        embeddings = config["freezer"]["embeddings"],
+        pos = config["freezer"]["pos"],
+        lm_head = config["freezer"]["lm_head"],
+        ln_f = config["freezer"]["ln_f"]
+    )
     if args.verbose >= 3:
         summary(model, input_data=(torch.randint(0, 128, size=(config["data"]["batch_size"], 256)), torch.randn(config["data"]["batch_size"], 1)))
     model.to(device)
@@ -69,7 +76,6 @@ def experiment1(args, kwargs):
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=config["training"]["lr"],
         weight_decay=config["training"]["weight_decay"])
-    loss = torch.nn.CrossEntropyLoss()
     scheduler = CosineAnnealingLR(optimizer, config["training"]["num_epochs"] * len(train_loader), eta_min=config["training"]["min_lr"])
 
     # Training
@@ -86,7 +92,6 @@ def experiment1(args, kwargs):
             optimizer=optimizer,
             train_loader=train_loader,
             val_loader=val_loader,
-            criterion=loss,
             num_epochs=config["training"]["num_epochs"],
             device=device,
             scheduler=scheduler,
@@ -107,7 +112,7 @@ def experiment1(args, kwargs):
         "model_state_dict"]
     model.load_state_dict(weights)
     # Test
-    results = evaluate(model, test_loader, loss, device, metrics=metrics)
+    results = evaluate(model, test_loader, device, metrics=metrics)
     log("Training done!  Saving...")
 
     save_dict = {
