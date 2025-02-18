@@ -12,3 +12,4 @@ tensorboard
 antho-utils
 torchmetrics
 transformers
+tiktoken
