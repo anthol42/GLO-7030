@@ -4,6 +4,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from pyutils import ConfigFile
+import matplotlib.pyplot as plt
 # ---------------------------------------------------------------------------------------------------------------------
 
 @dataclass
@@ -27,8 +28,8 @@ class CausalSelfAttention(nn.Module):
         self.register_buffer("bias", torch.tril(torch.ones(config['block_size'], config['block_size']))
                              .view(1, 1, config['block_size'], config['block_size']))
 
-    def forward(self, x):
-        # TODO: Add padding mask: maybe this as an example: https://stats.stackexchange.com/questions/598239/how-is-padding-masking-considered-in-the-attention-head-of-a-transformer
+    def forward(self, x, pad_mask):
+        # pad_mask: Shape(B, T)
         B, T, C = x.size()
 
         qkv = self.c_attn(x)
@@ -38,14 +39,18 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # Shape(B, nh, T, hs)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # Shape(B, nh, T, hs)
 
-        att = (q @ k.transpose(-2, -1)) * (math.sqrt(k.size(-1))**-1)
-        att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float("-inf"))
+        att = (q @ k.transpose(-2, -1)) * (math.sqrt(k.size(-1))**-1)   # Shape(B, nh, T, T)
+
+        mask = torch.logical_or(self.bias[:, :, :T, :T] == 0, pad_mask.unsqueeze(1).unsqueeze(3))
+
+        att = att.masked_fill(mask, float("-inf"))
         att = F.softmax(att, dim=-1)
         y = att @ v
         y = y.transpose(1, 2).contiguous().view(B, T, C)
 
         y = self.c_proj(y)
         return y
+
 class MLP(nn.Module):
     def __init__(self, config: ConfigFile):
         super().__init__()
@@ -68,8 +73,8 @@ class Block(nn.Module):
         self.ln_2 = nn.LayerNorm(config['n_embd'])
         self.mlp = MLP(config)
 
-    def forward(self, x):
-        x = x + self.attn(self.ln_1(x))
+    def forward(self, x, pad_mask):
+        x = x + self.attn(self.ln_1(x), pad_mask)
         x = x + self.mlp(self.ln_2(x))
         return x
 class GPT(nn.Module):
@@ -88,15 +93,14 @@ class GPT(nn.Module):
     def forward(self, idx, tox):
         B, T = idx.size()
         assert T <= self.config["block_size"], f"Cannot forward a text {T} bigger than blocksize {self.config['block_size']}"
-        # TODO: Add normalization by padding mask. Like ESM
-
+        pad_mask = torch.cat((torch.zeros((B, 1)), idx == -1), dim=1)   # -1 is Padding idx
         pos = torch.arange(0, T + 1, dtype=torch.long, device=idx.device)
         pos_emb = self.transformer.wpe(pos) # Shape(T, n_emb)
         tok_emb = self.transformer.wte(idx) # Shape(B, T, n_emb)
         tox_emb = self.tox_projector(tox).unsqueeze(1) # IN: Shape(B, 1) OUT: (B, 1, n_emb)
         x = torch.cat((tox_emb, tok_emb), dim=1) + pos_emb    # Implicit broadcasting Shape(B, T, n_emb)
         for block in self.transformer.h:
-            x = block(x)
+            x = block(x, pad_mask)
 
         x = self.transformer.ln_f(x)
         logits = self.lm_head(x)
@@ -212,6 +216,8 @@ if __name__ == "__main__":
     import tiktoken
     enc = tiktoken.get_encoding("gpt2")
     model = GPT.from_pretrained("gpt2")
+    # model = GPT(dict(n_layer=12, n_head=12, n_embd=768, vocab_size=50257, block_size=1024, bias=True))
+    # model(torch.randint(0, 10, size=(1, 10)), torch.randn(1, 1))
     summary(model, input_data=(torch.randint(0, 128, size=(128, 128)), torch.randn(128, 1)))
 
     # model = GPT(config)
