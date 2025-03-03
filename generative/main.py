@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser()
 # ------------------------------------------- Import here your experiments ------------------------------------------- #
 # ######################################################################################################################
 from experiments.experiment1 import experiment1
-
+from experiments.experiment2 import experiment2
 
 
 # ######################################################################################################################
@@ -30,6 +30,7 @@ parser.add_argument("--verbose", required=False, type=int, default=3)  # 3: all 
 # ######################################################################################################################
 experiments = {
     "experiment1":experiment1,
+    "experiment2":experiment2,
 }
 
 

@@ -22,7 +22,7 @@ metrics = {
 }
 
 
-def experiment1(args, kwargs):
+def experiment2(args, kwargs):
     config_loggers_with_verbose(args.verbose)
     # Setup
     device = utils.get_device(args.cpu)
@@ -89,6 +89,7 @@ def experiment1(args, kwargs):
     log("Begining training...")
     log(f"Watching: {args.watch}")
     try:
+        log("Phase 1")
         train(
             model=model,
             optimizer=optimizer,
@@ -97,6 +98,30 @@ def experiment1(args, kwargs):
             num_epochs=config["training"]["num_epochs"],
             device=device,
             scheduler=scheduler,
+            config=config,
+            metrics=metrics,
+            watch=args.watch,
+            sample_inputs=sample_inputs,
+            verbose=args.verbose
+        )
+        # Reactivate all parameters, and train for 1 epoch
+        log("Phase 2")
+        weights = torch.load(f'{config["model"]["model_dir"]}/{config["model"]["name"]}.pth', weights_only=False)[
+            "model_state_dict"]
+        model.load_state_dict(weights)
+        for param in model.parameters():
+            param.requires_grad = True
+        optimizer = torch.optim.AdamW(
+            model.parameters(), lr=0.1 * config["training"]["lr"],
+            weight_decay=0.)
+        train(
+            model=model,
+            optimizer=optimizer,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            num_epochs=1,
+            device=device,
+            scheduler=None,
             config=config,
             metrics=metrics,
             watch=args.watch,

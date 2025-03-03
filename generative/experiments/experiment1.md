@@ -1,12 +1,12 @@
 # Experiment 1
 
 ## Description
-The goal of this experiment is to demonstrate the extraordinary capabilities of deep neural networks.
-We are going to train a simple model using CNN layers and linear layers.
+This experiment trains the generative model in an autoregressive way in an end-to-end fashion.
+It supports two modes. One is a custom token that is dependent on the input toxicity. (Trainable transformation). The
+second is by writing the toxicity as text and finetuning the model.
 
 ## Hypothesis
-Since we are training and evaluating on the MNIST dataset, we expect results above 99% of accuracy since it is an easy 
-dataset.
+
 
 ## Results
 
