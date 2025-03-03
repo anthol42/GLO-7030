@@ -77,10 +77,13 @@ class Block(nn.Module):
         x = x + self.mlp(self.ln_2(x))
         return x
 class GPT(nn.Module):
-    def __init__(self, config: ConfigFile):
+    def __init__(self, config: ConfigFile, labelintext: bool = False):
         super().__init__()
         self.config = config
-        self.tox_projector = nn.Linear(1, config["n_embd"])
+        self.labelintext = labelintext
+        if not labelintext:
+            self.tox_projector = nn.Linear(1, config["n_embd"])
+
         self.transformer = nn.ModuleDict(dict(
             wte=nn.Embedding(config["vocab_size"], config["n_embd"], padding_idx=-1),
             wpe=nn.Embedding(config["block_size"], config["n_embd"]),
@@ -89,17 +92,23 @@ class GPT(nn.Module):
         ))
         self.lm_head = nn.Linear(config["n_embd"], config["vocab_size"], bias=False)
 
-    def forward(self, idx, tox):
+    def forward(self, idx, tox = None):
         B, T = idx.size()
         assert T <= self.config["block_size"], f"Cannot forward a text {T} bigger than blocksize {self.config['block_size']}"
         pad_mask = None # torch.cat((torch.zeros((B, 1), device=idx.device), idx == -1), dim=1)   # -1 is Padding idx
         # To avoid out of bounds error in embeddings
         idx[idx == -1] = 0
-        pos = torch.arange(0, T + 1, dtype=torch.long, device=idx.device)
-        pos_emb = self.transformer.wpe(pos) # Shape(T, n_emb)
-        tok_emb = self.transformer.wte(idx) # Shape(B, T, n_emb)
-        tox_emb = self.tox_projector(tox).unsqueeze(1) # IN: Shape(B, 1) OUT: (B, 1, n_emb)
-        x = torch.cat((tox_emb, tok_emb), dim=1) + pos_emb    # Implicit broadcasting Shape(B, T, n_emb)
+        if self.labelintext:
+            pos = torch.arange(0, T, dtype=torch.long, device=idx.device)
+            pos_emb = self.transformer.wpe(pos)  # Shape(T, n_emb)
+            tok_emb = self.transformer.wte(idx)  # Shape(B, T, n_emb)
+            x = tok_emb + pos_emb  # Implicit broadcasting Shape(B, T, n_emb)
+        else:
+            pos = torch.arange(0, T + 1, dtype=torch.long, device=idx.device)
+            pos_emb = self.transformer.wpe(pos)  # Shape(T, n_emb)
+            tok_emb = self.transformer.wte(idx)  # Shape(B, T, n_emb)
+            tox_emb = self.tox_projector(tox).unsqueeze(1) # IN: Shape(B, 1) OUT: (B, 1, n_emb)
+            x = torch.cat((tox_emb, tok_emb), dim=1) + pos_emb    # Implicit broadcasting Shape(B, T, n_emb)
         for block in self.transformer.h:
             x = block(x, pad_mask)
 
@@ -130,7 +139,7 @@ class GPT(nn.Module):
             for param in self.lm_head.parameters():
                 param.requires_grad = False
     @classmethod
-    def from_pretrained(cls, model_type, override_args=None):
+    def from_pretrained(cls, model_type, override_args=None, labelintext: bool = False):
         assert model_type in {'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'}
         override_args = override_args or {}  # default to empty dict
         # only dropout can be overridden see more notes below
@@ -150,7 +159,7 @@ class GPT(nn.Module):
             log(f"overriding dropout rate to {override_args['dropout']}")
             config['dropout'] = override_args['dropout']
         # create a from-scratch initialized minGPT model
-        model = GPT(config)
+        model = GPT(config, labelintext=labelintext)
         sd = model.state_dict()
         sd_keys = sd.keys()
         sd_keys = [k for k in sd_keys if not k.endswith('.attn.bias')]  # discard this mask / buffer, not a param

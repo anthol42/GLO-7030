@@ -3,7 +3,8 @@ config_format = {
         "batch_size": int,
         "shuffle": bool,
         "num_workers": int,
-        "context_len": int
+        "context_len": int,
+        "labelintext": bool
     },
     "training":{
         "num_epochs": int,

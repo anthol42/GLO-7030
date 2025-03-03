@@ -29,9 +29,9 @@ def split_dataset(config: ConfigFile, train_size: float = 0.8):
     test.to_csv("data/test.csv")
 
 class TextDataset(Dataset):
-    def __init__(self, data, config):
+    def __init__(self, data, labelintext):
         self.data = data
-        self.config = config
+        self.labelintext = labelintext
 
     def __len__(self):
         return len(self.data)
@@ -40,15 +40,21 @@ class TextDataset(Dataset):
         row = self.data.iloc[idx]
         comment = row["body"]
         label = row["score"]
+        if self.labelintext:
+            comment = f"Toxicity: {100*round(label, 2)}; {comment}"
         return comment, torch.tensor(label)
 
 class TextCollator:
-    def __init__(self, max_len: int = 256):
+    def __init__(self, max_len: int = 256, labelintext: bool = False):
         self.max_len = max_len
         self.tokenizer = tiktoken.get_encoding("gpt2")
+        self.labelintext = labelintext
 
     def prep_tensors(self, B, L):
-        tokens = torch.zeros((B, L), dtype=torch.int64) # We add 1 because of the <bos> token, aka <cls>
+        if self.labelintext:
+            tokens = torch.zeros((B, L + 1), dtype=torch.int64) # We add 1 because of the <bos> token, aka <cls>
+        else:
+            tokens = torch.zeros((B, L), dtype=torch.int64) # We already have a custom token
         tokens.fill_(-1)
         targets = torch.zeros((B, L + 1), dtype=torch.int64)
         targets.fill_(-1)
@@ -74,10 +80,20 @@ class TextCollator:
         scores = torch.tensor(labels).unsqueeze(1)
 
         # Fill the tensors
-        for i, tok in enumerate(toks):
-            tokens[i, :len(tok)] = tok
-            targets[i, :len(tok)] = tok
-            targets[i, len(tok)] = torch.tensor(50256, dtype=torch.int64) # End of text token : print(enc.encode("<|endoftext|>", allowed_special={"<|endoftext|>"}))
+        if self.labelintext:
+            for i, tok in enumerate(toks):
+                tokens[i, 1:len(tok) + 1] = tok
+                tokens[i, 0] = torch.tensor(50256,
+                                                    dtype=torch.int64) # End of text token is also start of text for GPT2
+                targets[i, :len(tok)] = tok
+                targets[i, len(tok)] = torch.tensor(50256,
+                                                    dtype=torch.int64)  # End of text token : print(enc.encode("<|endoftext|>", allowed_special={"<|endoftext|>"}))
+
+        else:
+            for i, tok in enumerate(toks):
+                tokens[i, :len(tok)] = tok
+                targets[i, :len(tok)] = tok
+                targets[i, len(tok)] = torch.tensor(50256, dtype=torch.int64) # End of text token : print(enc.encode("<|endoftext|>", allowed_special={"<|endoftext|>"}))
 
         return texts, tokens, scores, targets
 
@@ -95,11 +111,11 @@ def make_dataloaders(config: ConfigFile):
     valid_data = data.drop(index=train_data.index)
     test_data = pd.read_csv("data/test.csv", index_col=0)
 
-    train = TextDataset(train_data, config)
-    valid = TextDataset(valid_data, config)
-    test = TextDataset(test_data, config)
+    train = TextDataset(train_data, config["data"]["labelintext"])
+    valid = TextDataset(valid_data, config["data"]["labelintext"])
+    test = TextDataset(test_data, config["data"]["labelintext"])
 
-    collator = TextCollator(max_len=config["data"]["context_len"])
+    collator = TextCollator(max_len=config["data"]["context_len"], labelintext=config["data"]["labelintext"])
     num_workers = config["data"]["num_workers"]
     train_dl = DataLoader(train, batch_size=config["data"]["batch_size"], collate_fn=collator,
                           num_workers=num_workers, persistent_workers=num_workers > 0,

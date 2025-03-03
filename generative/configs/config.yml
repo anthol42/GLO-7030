@@ -3,6 +3,7 @@ data:
   shuffle: True
   num_workers: 2
   context_len: 256
+  labelintext: False
 training:
   num_epochs: 50
   lr: 0.0005
@@ -13,8 +14,8 @@ model:
   name: "GPT2"
 freezer:
   transformer: 0.
-  embeddings: false
-  pos: false
-  lm_head: false
-  ln_f: false
+  embeddings: False
+  pos: False
+  lm_head: False
+  ln_f: False
 seed: 42

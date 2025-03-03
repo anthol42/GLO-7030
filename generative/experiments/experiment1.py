@@ -59,7 +59,7 @@ def experiment1(args, kwargs):
     log("Data loaded successfully!")
 
     # Loading the model
-    model = GPT.from_pretrained("gpt2")
+    model = GPT.from_pretrained("gpt2", labelintext=config["data"]["labelintext"])
     model.freeze(
         transformer=config["freezer"]["transformer"],
         embeddings = config["freezer"]["embeddings"],
