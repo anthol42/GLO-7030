@@ -1,0 +1,13 @@
+pandas
+numpy
+scikit-learn
+scipy
+torch
+torchvision
+torchinfo
+transformers
+kagglehub
+kagglehub[pandas-datasets]
+git+https://github.com/huggingface/transformers@v4.49.0-Gemma-3
+accelerate
+rich
