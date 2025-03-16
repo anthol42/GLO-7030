@@ -102,10 +102,10 @@ class ToxicityPipeline:
         """
         # Generate target scores
         if distribution == 'uniform':
-            scores = np.linspace(-1, 1, num_samples)
+            scores = np.linspace(-1, 0.99, num_samples)
         elif distribution == 'normal':
             scores = np.random.normal(mean, std, num_samples)
-            scores = np.clip(scores, -1.0, 1.0)
+            scores = np.clip(scores, -1.0, 0.99)
         else:
             raise ValueError("Invalid distribution type")
             
@@ -118,18 +118,30 @@ class ToxicityPipeline:
             self.console.print(messages)
             
             inputs = self.processor.apply_chat_template(
-                messages, add_generation_prompt=True, tokenize=True,
-                return_dict=True, return_tensors="pt"
+                messages, 
+                add_generation_prompt=True, 
+                tokenize=True,
+                return_dict=True, 
+                return_tensors="pt",
+                truncation=False,
+                max_length=None,
             ).to(self.model.device, dtype=torch.bfloat16)
             
             input_len = inputs["input_ids"].shape[-1]
             
             with torch.inference_mode():
-                generation = self.model.generate(**inputs)
+                generation = self.model.generate(
+                    **inputs,
+                    max_new_tokens=max_length,
+                    temperature=0.7,
+                    top_p=0.9,
+                    num_return_sequences=1,
+                    do_sample=True
+                )
                 generation = generation[0][input_len:]
 
             generated_text = self.processor.decode(generation, skip_special_tokens=True)
-            comment = generated_text.split("Generated Comment:")[-1].strip()
+            comment = generated_text.split("Generated comment:")[-1].split("\n")[0].strip()
             
             results.append({
                 "target_score": score,

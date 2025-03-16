@@ -5,7 +5,7 @@ from transformers import AutoProcessor, Gemma3ForConditionalGeneration
 import torch
 
 class Gemma3Model:
-    def __init__(self, model_id="google/gemma-3-4b-it", device=None):
+    def __init__(self, model_id="google/gemma-3-12b-it", device=None):
         self.model_id = model_id
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         
@@ -16,9 +16,6 @@ class Gemma3Model:
             self.model_id,
             device_map="auto"
         )
-        
-        if self.device == "cuda" and torch.cuda.is_available():
-            model = model.to(self.device)
             
         model.eval()
         
