@@ -1,4 +1,5 @@
 import numpy as np
+from rich import print
 
 class ToxicityPromptBuilderIT:
     """
@@ -14,6 +15,7 @@ class ToxicityPromptBuilderIT:
     """
     
     def __init__(self, dataframe, seed=None):
+        print("Initializing ToxicityPromptBuilderIT...")
         self.df = dataframe.copy()
         self.seed = seed
         self.rng = np.random.default_rng(seed)
@@ -37,7 +39,8 @@ class ToxicityPromptBuilderIT:
                         "- No discriminatory content\n"
                         "Scores range from -1 (non-toxic) to 1 (toxic). "
                         "Even for high scores, maintain constructive criticism."
-                        "Given a toxicity score, generate a comment that matches this score on a scale from -1 to 1 where 1 is very toxic and -1 is not toxic at all.")
+                        "Given a toxicity score, generate a comment that matches this score on a scale from -1 to 1 where 1 is very toxic and -1 is not toxic at all."
+                        "Format: Generated comment: [your text here]\n")
             }]
         }
         
@@ -130,7 +133,7 @@ class ToxicityPromptBuilderIT:
                     "role": "assistant",
                     "content": [{
                         "type": "text",
-                        "text": ex['body']
+                        "text": f"Generated comment: {ex['body']}"
                     }]
                 }
             ])

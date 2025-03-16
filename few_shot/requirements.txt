@@ -11,3 +11,5 @@ kagglehub[pandas-datasets]
 git+https://github.com/huggingface/transformers@v4.49.0-Gemma-3
 accelerate
 rich
+# python -m pip install wheel setuptools
+# pip install flash-attn --no-build-isolation

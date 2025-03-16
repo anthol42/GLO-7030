@@ -1,6 +1,7 @@
 import pandas as pd
 from kagglehub import KaggleDatasetAdapter
 import kagglehub
+import os
 
 class RudditDataProcessor:
     """
@@ -30,14 +31,23 @@ class RudditDataProcessor:
         Raises:
             Exception: If loading fails
         """
+        print("Loading dataset from Kaggle...")
         try:
             file_path = "ruddit_comments_score.csv"
+            if os.path.exists(file_path):
+                self.df = pd.read_csv(file_path)
+                print("File already exists. Loaded from local.")
+                return
+            
             self.df = kagglehub.load_dataset(
                 KaggleDatasetAdapter.PANDAS,
                 "estebanmarcelloni/ruddit-papers-comments-scored",
                 file_path,
             )
             self.original_columns = self.df.columns.tolist()
+            
+            self.df.to_csv(file_path, index=False) 
+            
             print("Dataset loaded successfully. Shape:", self.df.shape)
         except Exception as e:
             raise RuntimeError(f"Failed to load dataset: {str(e)}")
@@ -52,6 +62,13 @@ class RudditDataProcessor:
         5. Trimming whitespace
         6. Removing multiline skips
         """
+        print("Cleaning data...")
+        file_path = "ruddit_comments_score_cleaned.csv"
+        if os.path.exists(file_path):
+            self.df = pd.read_csv(file_path)
+            print("File already exists. Loaded from local.")
+            return
+        
         if self.df is None:
             raise ValueError("No data to clean. Load data first using load_from_kaggle()")
             
@@ -67,6 +84,9 @@ class RudditDataProcessor:
         self.df['body'] = self.df['body'].str.replace(r'\n+', ' ', regex=True)
         
         self.df = self.df.reset_index(drop=True)
+        
+        self.df.to_csv(file_path, index=False)
+        
         print("Data cleaned. New shape:", self.df.shape)
 
     def save_to_csv(self, filename, subset=None, index=False, df=None):

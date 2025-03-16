@@ -3,6 +3,7 @@
 
 from transformers import AutoProcessor, Gemma3ForConditionalGeneration
 import torch
+from rich import print
 
 class Gemma3Model:
     def __init__(self, model_id="google/gemma-3-12b-it", device=None):
@@ -10,11 +11,15 @@ class Gemma3Model:
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         
     def load(self):
+        print(f"Loading model {self.model_id}...")
+        
         tokenizer = AutoProcessor.from_pretrained(self.model_id)
         
         model = Gemma3ForConditionalGeneration.from_pretrained(
             self.model_id,
-            device_map="auto"
+            device_map="auto",
+            torch_dtype=torch.bfloat16,
+            attn_implementation="flash_attention_2"
         )
             
         model.eval()
