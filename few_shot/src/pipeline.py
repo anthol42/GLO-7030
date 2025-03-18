@@ -91,27 +91,37 @@ class ToxicityPipeline:
             list: Predicted scores with metadata
         """
         results = []
-        table = self._create_score_table("Toxicity Score Predictions")
+        table = self._create_score_table(data=[], title="Toxicity Score Prediction")
         
         for comment in track(comments, description="Analyzing comments..."):
             messages = self.prompt_builder.construct_few_shot_prompt_forward(comment, n=n_shot)
 
-            self.console.print(messages)
-            
             inputs = self.processor.apply_chat_template(
-                messages, add_generation_prompt=True, tokenize=True,
-                return_dict=True, return_tensors="pt"
+                messages, 
+                add_generation_prompt=True, 
+                tokenize=True,
+                return_dict=True, 
+                return_tensors="pt",
+                truncation=False,
+                max_length=None,
             ).to(self.model.device, dtype=torch.bfloat16)
             
             input_len = inputs["input_ids"].shape[-1]
             with torch.inference_mode():
-                generation = self.model.generate(**inputs)
+                generation = self.model.generate(
+                    **inputs,
+                    max_new_tokens=max_length,
+                    temperature=0.9,
+                    top_p=0.85,
+                    num_return_sequences=1,
+                    do_sample=True
+                )
                 generation = generation[0][input_len:]
                 
             generated_text = self.processor.decode(generation, skip_special_tokens=True)
             
             try:
-                score = float(generated_text.split("Predicted Toxicity Score:")[-1].strip())
+                score = float(generated_text.split("Toxicity Score:")[-1].strip())
                 score = np.clip(score, -1.0, 1.0)
             except:
                 score = None
@@ -123,9 +133,10 @@ class ToxicityPipeline:
             })
             
             table.add_row(
-                comment[:75] + "..." if len(comment) > 75 else comment,
-                str(score) if score else "ERROR",
-                "✓" if score else "✗"
+                comment, 
+                f"{score:.2f}" if score is not None else "Error", 
+                "", 
+                str(generated_text)
             )
             
         self.console.print(table)

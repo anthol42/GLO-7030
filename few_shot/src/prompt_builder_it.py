@@ -21,13 +21,23 @@ class ToxicityPromptBuilderIT:
         self.rng = np.random.default_rng(seed)
         self.system_message_forward = {
             "role": "system",
-            "content": [{
-                "type": "text",
-                "text": ("You are a toxicity analysis expert. "
-                            "Given a comment, predict its toxicity score on a scale from -1 to 1.")
-            }]
+            "content": [
+                {
+                    "type": "text",
+                    "text": (
+                        "You are a toxicity analysis expert. "
+                        "Given a comment, predict its toxicity score on a scale from -1 to 1."
+                        "\n\n"
+                        "On the scale: "
+                        "- Examples at -1 are constructive, supportive, and positive"
+                        "- Examples at 0 are neutral or balanced"
+                        "- Examples at +1 demonstrate toxic language"
+                        "Format your response as:: Toxicity Score: [your score here]"
+                    ),
+                }
+            ],
         }
-        
+
         self.system_message_backward = {
             "role": "system",
             "content": [{
@@ -96,7 +106,7 @@ class ToxicityPromptBuilderIT:
                     "role": "user",
                     "content": [{
                         "type": "text",
-                        "text": f"Comment: {ex['body']}\nWhat is the toxicity score?"
+                        "text": f"Comment: {ex['body']}"
                     }]
                 },
                 {
@@ -112,7 +122,7 @@ class ToxicityPromptBuilderIT:
             "role": "user",
             "content": [{
                 "type": "text",
-                "text": f"Comment: {input_comment}\nWhat is the toxicity score?"
+                "text": f"Comment: {input_comment}"
             }]
         })
         
