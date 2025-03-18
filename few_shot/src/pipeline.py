@@ -78,7 +78,7 @@ class ToxicityPipeline:
         table.add_column("Confidence", style="yellow")
         return table
     
-    def forward_pass(self, comments, n_shot=3, max_length=50):
+    def forward_pass(self, comments, n_shot=10, max_length=50):
         """
         Predict toxicity scores for a list of comments.
         

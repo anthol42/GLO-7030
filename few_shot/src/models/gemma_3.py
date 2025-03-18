@@ -1,4 +1,4 @@
-# from  https://huggingface.co/google/gemma-3-4b-it
+# from  https://huggingface.co/google/gemma-3-12b-it
 #       https://github.com/huggingface/transformers/releases/tag/v4.49.0-Gemma-3
 
 from transformers import AutoProcessor, Gemma3ForConditionalGeneration
