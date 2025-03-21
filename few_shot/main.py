@@ -60,7 +60,7 @@ if __name__ == "__main__":
         df = pd.DataFrame(results)[['generated_comment', 'target_score']]
         df = df.rename(columns={'generated_comment': 'body', 'target_score': 'score'})
         data_processor.save_to_csv("few_shot_backward.csv", df=df)
-        print("Backward pass completed. Results saved to few_shot_backward.csv.")
+        print("Backward pass completed. Results saved to few_shot_backward.csv")
         
     else:
         # Forward pass: Predict scores for existing comments

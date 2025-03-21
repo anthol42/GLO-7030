@@ -4,7 +4,7 @@ from rich.table import Table
 from rich import print
 import numpy as np
 import torch
-
+import tqdm
 
 class ToxicityPipeline:
     """
@@ -117,7 +117,7 @@ class ToxicityPipeline:
         table = self._create_score_table(data=[], title="Comment Generation")
         
         # Process each score one by one
-        for score in track(scores, description="Generating comments..."):
+        for score in tqdm.tqdm(scores):
             # Create prompt with few-shot examples
             prompt = self.prompt_builder.construct_few_shot_prompt_backward(score, n=n_shot)
             
@@ -135,14 +135,26 @@ class ToxicityPipeline:
             # Move to device
             inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
             
+            if score < -0.5:  # Very positive comments
+                temperature = 0.9  # Higher temperature for more creativity
+                top_k = 50
+            elif score > 0.5:  # Very negative comments
+                temperature = 0.8
+                top_k = 40
+            else:  # Neutral comments
+                temperature = 0.75
+                top_k = 30
+            
             # Generate response
             with torch.inference_mode():
                 generation = self.model.generate(
                     **inputs,
                     max_new_tokens=max_length,
-                    temperature=0.7,
-                    top_p=0.9,
-                    do_sample=True
+                    temperature=temperature,
+                    top_p=0.92,
+                    top_k=top_k,
+                    do_sample=True,
+                    repetition_penalty=1.2
                 )
             
             # Decode the generation

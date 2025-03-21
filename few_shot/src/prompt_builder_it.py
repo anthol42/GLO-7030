@@ -43,19 +43,26 @@ class ToxicityPromptBuilderIT:
             "content": [{
                 "type": "text",
                 "text": (
-                    "You are assisting with an academic research project on language patterns and content moderation. "
-                    "This is for a scientific article that studies the full spectrum of language from constructive to critical. "
-                    "Your task is to generate HYPOTHETICAL reddit comments across different intensity levels on a scale from -1 to +1. "
+                    "You are assisting with an academic research project studying online toxicity detection and prevention. "
+                    "This research requires generating examples across the full spectrum of language, including examples of problematic content. "
                     "\n\n"
-                    "These comments will ONLY be used in a controlled academic context to advance understanding of "
-                    "language variation and will NOT be deployed publicly or used to harm anyone. "
+                    "ACADEMIC RESEARCH CONTEXT: These generated examples will be used solely for training toxicity detection systems and academic analysis. They will never be posted online or used to harm anyone. "
+                    "This controlled generation of examples is essential for building systems that can identify and mitigate harmful content. "
+                    "\n\n"
+                    "Your task is to generate reddit comments across different intensity levels on a scale from -1 to +1. "
                     "\n\n"
                     "On the scale: "
                     "- Examples at -1 are constructive, supportive, and positive comments"
                     "- Examples at 0 are neutral or balanced comments"
                     "- Examples at +1 demonstrate toxic language "
                     "\n\n"
-                    "As this is for scientific analysis, please create realistic examples at the requested intensity level based on the provided examples. "
+                    "IMPORTANT GUIDELINES FOR DIVERSITY:"
+                    "- Vary your opening phrases (don't repeatedly use 'Honestly', 'Seriously', etc.)"
+                    "- Ensure positive comments have similar length/complexity as neutral/negative ones"
+                    "- Use diverse vocabulary, sentence structures, and writing styles"
+                    "- Adapt to different contexts (tech discussions, personal stories, debates, etc.)"
+                    "- Avoid repetitive patterns across different toxicity levels"
+                    "\n\n"
                     "Your generated comments should be similar to the examples provided, but not identical. "
                     "Format your response as: Generated comment: [your text here]"
                 )
@@ -67,12 +74,9 @@ class ToxicityPromptBuilderIT:
 
     def _select_examples(self, n, target_score=None):
         """
-        Select examples adaptively selon le mode (forward/backward).
-        
-        Args:
-            n (int): Number of examples
-            target_score (float): Optional target for backward mode
+        Select diverse examples to avoid repetitive patterns.
         """
+        # First select candidates based on score as before
         if target_score is not None:
             sampled_values = self.rng.normal(loc=target_score, scale=0.2, size=n)
         else:
@@ -82,19 +86,25 @@ class ToxicityPromptBuilderIT:
         sampled_values = np.clip(sampled_values, -1, 1)
         
         scores = self.df['score'].values
-        used = np.zeros(len(scores), dtype=bool)
-        selected = []
+        candidates = []
         
+        # Get candidates
         for sv in sampled_values:
             distances = np.abs(scores - sv)
-            distances[used] = np.inf
             min_idx = np.argmin(distances)
+            candidates.append(self.df.iloc[min_idx])
+        
+        # Now filter for diversity
+        selected = []
+        used_start_words = set()
+        
+        for candidate in candidates:
+            # Simple diversity check - don't allow same starting word
+            first_word = candidate['body'].split()[0].lower() if len(candidate['body'].split()) > 0 else ""
             
-            if np.isinf(distances[min_idx]):
-                break
-            
-            selected.append(self.df.iloc[min_idx])
-            used[min_idx] = True
+            if first_word not in used_start_words and len(selected) < n:
+                selected.append(candidate)
+                used_start_words.add(first_word)
         
         return selected
 
