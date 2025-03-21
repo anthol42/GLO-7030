@@ -51,9 +51,7 @@ if __name__ == "__main__":
     if args.mode == "backward":
         # Backward pass: Generate comments from scores
         results = pipeline.backward_pass(
-            num_samples=6000,  # Keep or make configurable
-            batch_size=16,
-            num_workers=16,
+            num_samples=args.num_samples,
             max_length=100,
             n_shot=n_shot,
         )

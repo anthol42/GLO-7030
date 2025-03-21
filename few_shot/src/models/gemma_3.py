@@ -3,8 +3,6 @@
 
 from transformers import AutoProcessor, Gemma3ForConditionalGeneration
 import torch
-from rich import print
-
 
 class Gemma3Model:
     def __init__(self, model_id="google/gemma-3-12b-it", device=None, quantize=True, load_in_4bit=True):
@@ -34,6 +32,7 @@ class Gemma3Model:
                 device_map="auto",
                 quantization_config=quantization_config,
                 torch_dtype=torch.bfloat16,
+                attn_implementation="eager"
             )
         else:
             # Chargement standard mais avec configuration optimisée pour inférence
