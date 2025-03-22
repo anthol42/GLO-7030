@@ -38,15 +38,15 @@ if __name__ == "__main__":
     messages = [system_msg]
     original = pd.read_csv("data/train.csv")
     new_data = []
-    for i in progress(range(len(original))):
-        row = original.loc[i]
-        message = row["body"]
-        label = row["score"]
-        msg = Message(role="user", content=message)
-        response: ChatResponse = client.chat(model='rolandroland/llama3.1-uncensored',
-                                             messages=render_msg([system_msg, msg]))
-        new_data.append((response.message.content, label))
-
+    for _ in range(10):
+        for idx in progress(range(len(original))):
+            row = original.loc[idx]
+            message = row["body"]
+            label = row["score"]
+            msg = Message(role="user", content=message)
+            response: ChatResponse = client.chat(model='rolandroland/llama3.1-uncensored',
+                                                 messages=render_msg([system_msg, msg]))
+            new_data.append((response.message.content, label))
 
     new_dataset = pd.DataFrame(new_data, columns=["bidy", "label"])
-    new_dataset.to_csv("data/reform_llama3.1-uncessored.csv", index=False)
+    new_dataset.to_csv("data/reform_llama3.1-uncessoredV2.csv", index=False)
