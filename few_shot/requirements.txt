@@ -2,7 +2,7 @@ pandas
 numpy
 scikit-learn
 scipy
-torch
+torch~=2.4.0
 torchvision
 torchinfo
 transformers
@@ -11,5 +11,7 @@ kagglehub[pandas-datasets]
 git+https://github.com/huggingface/transformers@v4.49.0-Gemma-3
 accelerate
 rich
+bitsandbytes
+tqdm
 # python -m pip install wheel setuptools
 # pip install flash-attn --no-build-isolation
