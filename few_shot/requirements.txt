@@ -13,5 +13,7 @@ accelerate
 rich
 bitsandbytes
 tqdm
+openai
+python-dotenv
 # python -m pip install wheel setuptools
 # pip install flash-attn --no-build-isolation

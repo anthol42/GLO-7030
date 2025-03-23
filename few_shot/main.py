@@ -3,11 +3,15 @@ from src.prompt_builder import ToxicityPromptBuilder
 from src.data_processor import RudditDataProcessor
 from src.models.gemma_3 import Gemma3Model
 from src.models.dolphin_llama_3_1 import DolphinLLama3_1
-from src.pipeline import ToxicityPipeline
+from src.pipeline import ToxicityPipeline, ToxicityPipelineOpenRouter
 
 import pandas as pd
 import numpy as np
 import argparse
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
 
 SEED = 42
 N_EXAMPLES = 100
@@ -25,6 +29,8 @@ if __name__ == "__main__":
                         help='Number of examples for forward pass. Default is 100.')
     parser.add_argument('--n_shot', type=int, default=10,
                         help='Number of few-shot examples for forward pass. Default is 10.')
+    parser.add_argument('--open_router', action='store_true',
+                        help='Use open router for model loading.')
     args = parser.parse_args()
 
     # Initialize data processor
@@ -38,22 +44,25 @@ if __name__ == "__main__":
     # prompt_builder = ToxicityPromptBuilder(data_processor.df, seed=None)
     
     # Load the specified model
-    if args.model == "gemma3":
-        gemma = Gemma3Model()
-        model, tokenizer = gemma.load()
+    if not args.open_router:
+        if args.model == "gemma3":
+            gemma = Gemma3Model()
+            model, tokenizer = gemma.load()
+        else:
+            dolphin = DolphinLLama3_1()
+            model, tokenizer = dolphin.load()
+
+    if args.open_router:
+        pipeline = ToxicityPipelineOpenRouter(prompt_builder, os.getenv("OPENROUTER_API_KEY"))
     else:
-        dolphin = DolphinLLama3_1()
-        model, tokenizer = dolphin.load()
-    n_shot = args.n_shot
-    
-    pipeline = ToxicityPipeline(model, tokenizer, data_processor, prompt_builder)
+        pipeline = ToxicityPipeline(model, tokenizer, data_processor, prompt_builder)
     
     if args.mode == "backward":
         # Backward pass: Generate comments from scores
         results = pipeline.backward_pass(
             num_samples=args.num_samples,
             max_length=100,
-            n_shot=n_shot,
+            n_shot=args.n_shot,
         )
         
         # Save results
@@ -70,7 +79,7 @@ if __name__ == "__main__":
         
         results = pipeline.forward_pass(
             comments=comments,
-            n_shot=n_shot,
+            n_shot=args.n_shot,
             max_length=10,
         )
         

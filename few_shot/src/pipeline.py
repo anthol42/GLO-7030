@@ -186,3 +186,93 @@ class ToxicityPipeline:
             return generated_text.strip()
         except:
             return generated_text
+        
+from openai import OpenAI
+import time
+        
+class ToxicityPipelineOpenRouter(ToxicityPipeline):
+    # Same function as ToxicityPipeline but using OpenRouter calls to generate
+    # comments and scores
+    
+    def __init__(self, prompt_builder, api_key, model="google/gemini-2.0-flash-lite-001"):
+        self.client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+        )
+        self.console = Console()
+        self.model = model
+        self.prompt_builder = prompt_builder
+        
+    def call_model(self, prompt, max_tokens, max_retries=10, backoff_factor=2):
+        for attempt in range(max_retries):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=prompt,
+                    max_tokens=max_tokens,
+                    temperature=0.9,
+                    top_p=0.85,
+                    n=1,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait_time = backoff_factor ** attempt
+                    print(f"API call failed: {str(e)}. Retrying in {wait_time}s...")
+                    print(response)
+                    time.sleep(wait_time)
+                else:
+                    print(f"Failed after {max_retries} attempts: {str(e)}")
+                    return ""
+    
+    def generate_comment(self, score, n_shot=10, max_length=100):
+        prompt = self.prompt_builder.construct_few_shot_prompt_backward(score, n=n_shot)
+        
+        generated_text = self.call_model(prompt, max_length)
+        
+        comment = self._extract_comment(generated_text)
+        
+        return comment
+    
+    def backward_pass(self, num_samples=50, distribution='uniform',
+                    mean=0.0, std=0.5, max_length=100, 
+                    n_shot=10):
+        """
+        Generate comments based on toxicity scores using a standard iterative approach
+        """
+        # Generate target scores
+        if distribution == 'uniform':
+            scores = np.linspace(-1, 1, num_samples)
+        elif distribution == 'normal':
+            scores = np.random.normal(mean, std, num_samples)
+            scores = np.clip(scores, -1.0, 1)
+        else:
+            raise ValueError("Invalid distribution type")
+
+        results = []
+        table = self._create_score_table(data=[], title="Comment Generation")
+        
+        # Process each score one by one
+        for score in tqdm.tqdm(scores):
+            # Create prompt with few-shot examples
+            prompt = self.prompt_builder.construct_few_shot_prompt_backward(score, n=n_shot)
+            
+            # Call the OpenRouter API
+            generated_text = self.call_model(prompt, max_length)
+            
+            comment = self._extract_comment(generated_text)
+            
+            # print(f"Generated comment: {comment}")
+            
+            # Store the result
+            results.append({
+                "target_score": float(score),
+                "generated_comment": comment,
+                "full_output": generated_text
+            })
+            
+            table.add_row(f"{score:.2f}", comment, "", "✓")
+
+        self.console.print(table)
+        return results
+
