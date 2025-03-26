@@ -39,7 +39,7 @@ def back_translate_batch(texts, model, tokenizer, intermediate_langs):
 
 def back_translate(df, model, tokenizer, intermediate_langs):
     new_df = df.copy()
-    batch_size = 16  # Adjust based on GPU memory
+    batch_size = 4  # Adjust based on GPU memory
     batches = [df['body'][i:i+batch_size] for i in range(0, len(df), batch_size)]
     results = []
     
@@ -51,5 +51,5 @@ def back_translate(df, model, tokenizer, intermediate_langs):
             intermediate_langs
         ))
     
-    new_df['translated'] = results
+    new_df['body'] = results
     return new_df
