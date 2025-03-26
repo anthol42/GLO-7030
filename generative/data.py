@@ -9,25 +9,6 @@ import numpy as np
 from typing import *
 import tiktoken
 
-def split_dataset(config: ConfigFile, train_size: float = 0.8):
-    if config["seed"] is not None:
-        np.random.seed(config["seed"])
-        seed = config["seed"]
-    else:
-        seed = None
-
-    df = pd.read_csv("data/ruddit_comments_score.csv")
-
-    # Filter deleted
-    df = df.loc[df["body"] != "[deleted]"]
-    df = df.loc[df["body"] != "[removed]"]
-
-    train = df.sample(frac=train_size, random_state=seed)
-    test = df.drop(index=train.index)
-
-    train.to_csv("data/train.csv")
-    test.to_csv("data/test.csv")
-
 class TextDataset(Dataset):
     def __init__(self, data, labelintext):
         self.data = data
@@ -98,18 +79,9 @@ class TextCollator:
         return texts, tokens, scores, targets
 
 def make_dataloaders(config: ConfigFile):
-    if not os.path.exists("data/train.csv") or not os.path.exists("data/test.csv"):
-        split_dataset(config)
-
-    if config["seed"] is not None:
-        np.random.seed(config["seed"])
-        seed = config["seed"]
-    else:
-        seed = None
-    data = pd.read_csv("data/train.csv", index_col=0)
-    train_data = data.sample(frac=0.9, random_state=seed)
-    valid_data = data.drop(index=train_data.index)
-    test_data = pd.read_csv("data/test.csv", index_col=0)
+    train_data = pd.read_csv("../data/train.csv", index_col=0)
+    valid_data = pd.read_csv("../data/valid.csv", index_col=0)
+    test_data = pd.read_csv("../data/test.csv", index_col=0)
 
     train = TextDataset(train_data, config["data"]["labelintext"])
     valid = TextDataset(valid_data, config["data"]["labelintext"])

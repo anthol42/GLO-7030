@@ -162,7 +162,7 @@ def experiment2(args, kwargs):
 
     # Save results
     if not DEBUG:
-        resultSocket.write(loss=results["loss"])
+        resultSocket.write(loss=results["loss"].item())
         rtable.toTxt()
 
 
