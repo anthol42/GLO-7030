@@ -3,9 +3,9 @@ data:
   shuffle: True
   num_workers: 2
   context_len: 256
-  labelintext: False
+  labelintext: True
 training:
-  num_epochs: 10
+  num_epochs: 1
   lr: 0.0005
   weight_decay:  0.0005
   min_lr: 0.0005
@@ -13,9 +13,9 @@ model:
   model_dir: "saved_models/classifier"
   name: "GPT2"
 freezer:
-  transformer: 1.
-  embeddings: True
-  pos: True
-  lm_head: True
-  ln_f: True
-seed: 42
+  transformer: 0.
+  embeddings: False
+  pos: False
+  lm_head: False
+  ln_f: False
+seed: 7

@@ -22,7 +22,7 @@ class TextDataset(Dataset):
         comment = row["body"]
         label = row["score"]
         if self.labelintext:
-            comment = f"Toxicity: {100*round(label, 2)}; {comment}"
+            comment = f"{100*round(label, 2)}: {comment}"
         return comment, torch.tensor(label)
 
 class TextCollator:
