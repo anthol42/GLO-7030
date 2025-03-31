@@ -10,79 +10,140 @@ from pyutils import ConfigFile
 import matplotlib.pyplot as plt
 from utils.bin import *
 import utils
-from models.llama import Transformer, ModelArgs,Tokenizer
-from configs.formats import config_format
-from time import time
+from models.gpt2 import GPT
+from models.test import Tokenizer,ModelArgs,Transformer
+import json
+from pathlib import Path
 
+def generate(model, enc, str2complete, tox: float, device, b_size, max_length, temperature, log: bool = True):
+    tokens = enc.encode(str2complete)
+    tokens = torch.tensor(tokens, dtype=torch.long)
+    tokens = tokens.unsqueeze(0).repeat(b_size, 1).to(device)
+    tox = torch.tensor(tox).unsqueeze(0).repeat(b_size, 1).to(device)
+    x = tokens
+    # Let's generate
+    torch.manual_seed(42)
+    while x.size(1) < max_length:
+        with torch.inference_mode():
+            logits = model(x, tox)[:, -1, :]
 
-def generate(model,enc, prompts:list[str], device, max_gen_len=256):
-    print(model.text_completion(enc,prompts,sample_rng,max_gen_len=max_gen_len,device=device))
+            probs = F.softmax(logits / temperature, dim=-1).cpu()
+
+            # We keep only the top 50 most likely tokens, so we do not sample a random token (non-zero probability)
+            topk_probs, topk_indices = torch.topk(probs, 50, dim=-1)
+
+            ix = torch.multinomial(topk_probs, 1)
+
+            xcol = torch.gather(topk_indices, -1, ix)  # Shape(B, 1)
+
+            x = torch.cat((x, xcol.to(device)), dim=1)
+
+    all_text = []
+    for i in range(b_size):
+        tokens = x[i, :max_length].tolist()
+        decoded = enc.decode(tokens)
+        end_idx = decoded.find("<|endoftext|>")
+        if end_idx == -1:
+            decoded += "..."
+            all_text.append(decoded)
+            print(decoded) if log else None
+        else:
+            all_text.append(decoded[:end_idx])
+            print(decoded[:end_idx]) if log else None
+        print("="*100) if log else None
+    return all_text
+
+def generate_labelintext(model, enc, str2complete, tox: float, device, b_size, max_length, temperature, log: bool = True):
+    print("prompt: ")
+    print(f"Toxicity : {round(tox*100,0)}; {str2complete}")
+    tokens = enc.encode(f"Toxicity : {round(tox*100,0)}; {str2complete}")
+    tokens = torch.tensor(tokens, dtype=torch.long)
+    tokens = tokens.unsqueeze(0).repeat(b_size, 1).to(device)
+    x = tokens
+    # Let's generate
+    torch.manual_seed(42)
+    while x.size(1) < max_length:
+        with torch.inference_mode():
+            logits = model(x, tox)[:, -1, :]
+
+            probs = F.softmax(logits / temperature, dim=-1).cpu()
+
+            # We keep only the top 50 most likely tokens, so we do not sample a random token (non-zero probability)
+            topk_probs, topk_indices = torch.topk(probs, 50, dim=-1)
+
+            ix = torch.multinomial(topk_probs, 1)
+
+            xcol = torch.gather(topk_indices, -1, ix)  # Shape(B, 1)
+
+            x = torch.cat((x, xcol.to(device)), dim=1)
+
+    all_text = []
+    for i in range(b_size):
+        tokens = x[i, :max_length].tolist()
+        decoded = enc.decode(tokens)
+        decoded = "".join(decoded.split(";")[1:])[1:]
+        end_idx = decoded.find("<|end_of_text|>")
+        if end_idx == -1:
+            decoded += "..."
+            all_text.append(decoded)
+            print(decoded) if log else None
+        else:
+            all_text.append(decoded[:end_idx])
+            print(decoded[:end_idx]) if log else None
+        print("=" * 100) if log else None
+    return all_text
 
 if __name__ == "__main__":
-    num_return_sequences = 5
+    device = "cuda"#  utils.get_device()
+    b_size = 8
     max_length = 256
-    config = dict(n_layer=12, n_head=12, n_embd=768, vocab_size=50257, block_size=1024, bias=True)
-    device = torch.device("cuda")
-    LLAMA32_CONFIG = {
-    "vocab_size": 128_256,      # Vocabulary size
-    "context_length": 8192,     # Context length
-    "emb_dim": 2048,            # Embedding dimension
-    "n_heads": 32,              # Number of attention heads
-    "n_layers": 16,             # Number of layers
-    "hidden_dim": 8192,         # Size of the intermediate dimension in FeedForward
-    "n_kv_groups": 8,           # Key-Value groups for grouped-query attention
-    "rope_base": 500_000.0,     # The base in RoPE's "theta"
-    "dtype": torch.bfloat16,    # Lower-precision dtype to reduce memory usage
-    "rope_freq": {              # RoPE frequency scaling
-        "factor": 32.0,
-        "low_freq_factor": 1.0,
-        "high_freq_factor": 4.0,
-        "original_context_length": 8192,
-    }
-}
-    model_args = ModelArgs()
-    model_args.dim = LLAMA32_CONFIG["emb_dim"]
-    model_args.n_layers = LLAMA32_CONFIG["n_layers"]
-    model_args.n_heads = LLAMA32_CONFIG["n_heads"]
-    model_args.n_kv_heads = LLAMA32_CONFIG["n_kv_groups"]
-    model_args.vocab_size = LLAMA32_CONFIG["vocab_size"]
-    model_args.multiple_of = 256  # Vous pouvez ajuster cette valeur si nécessaire
-    model_args.ffn_dim_multiplier = None  # Vous pouvez ajuster cette valeur si nécessaire
-    model_args.norm_eps = 1e-5  # Vous pouvez ajuster cette valeur si nécessaire
-    model_args.rope_theta = LLAMA32_CONFIG["rope_base"]
-    model_args.use_scaled_rope = True  # Si vous utilisez RoPE avec scaling
-    model_args.max_batch_size = 32  # Vous pouvez ajuster cette valeur si nécessaire
-    model_args.max_seq_len = LLAMA32_CONFIG["context_length"]
-    model_args.flash = False  # Vous pouvez ajuster cette valeur si nécessaire
-    
-    config = "configs/configLlama.yml"
-    config = ConfigFile(config, config_format, verify_path=True, profiles=["default"])
-    print(config)
+    temperature = 1.5
 
-    ckpt_path = "saved_models/Llama3.2-1B/1/Llama.pth"
-    ckpt_path = "saved_models/Llama3.2-1B/1consolidated.00.pth"
-    tokenizer_path = "saved_models/Llama3.2-1B/1tokenizer.model"
-    checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=True)
+
+
+
+  
+    ckpt_dir = "/home/jacob/.llama/checkpoints/Llama3.2-1B"
+    tokenizer_path = "saved_models/Llama3.2-1B/tokenizer.model"
+ 
+  
+
+    temperature = 1.0
+    top_p= 0.8
+    max_seq_len = 256
+    max_gen_len = 256
+    max_batch_size = 8
+    flash = False
+    with open(Path(ckpt_dir) / "params.json", "r") as f:
+            params = json.loads(f.read())
+
+    model_args: ModelArgs = ModelArgs(
+            max_seq_len=max_seq_len,
+            max_batch_size=max_batch_size,
+            flash=flash,
+            **params,
+        )
+    
+
+    enc = Tokenizer(model_path=tokenizer_path)
+
+
+   # enc = tiktoken.get_encoding("gpt2")
+
+    #model = GPT(config, labelintext=True)
+    #checkpoint = torch.load("saved_models/Llama3.2-1B/3/Llama.pth", map_location="cpu")["model_state_dict"]
+    checkpoint = torch.load("saved_models/Llama3.2-1B/consolidated.00.pth", map_location="cpu")
 
     model = Transformer(model_args)
-    model.load_state_dict(checkpoint, strict=False)
-
-    print('Model Loaded...')
-    enc = Tokenizer(model_path=tokenizer_path)
     
 
-    model.to(device)
-    sample_rng = torch.Generator(device='cuda')
-    sample_rng.manual_seed(1337)
-    
-   
-    
+    model.load_state_dict(checkpoint, strict=True)
+    #model.bfloat16()
+
+    device = torch.device("cuda")
+    model.to(device=device)
 
 
-    #model.generate(tokenizer,[token],sample_rng,256,tox=tox )
-    prompts = ["Hi, ", "hello,"]
-    t1 = time()
-    print(model.text_completion(enc,device,prompts,sample_rng,max_gen_len=128))
-    print(f"TOTAL GEN TIME for {len(prompts)} generations : ", time()-t1 )
-
-    
+    str2complete = ""
+    generate_labelintext(model, enc, str2complete, 0.9, device, b_size, max_length, temperature, log=True)
+    # generate_labelintext(model, str2complete, -0.99, device)
