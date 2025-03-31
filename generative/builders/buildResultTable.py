@@ -1,5 +1,3 @@
-import sys
-sys.path.append("..")
 from pathlib import PurePath
 from utils import TableBuilder
 
