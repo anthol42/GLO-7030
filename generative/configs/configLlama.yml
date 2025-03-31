@@ -1,0 +1,21 @@
+data:
+  batch_size: 4
+  shuffle: True
+  num_workers: 2
+  context_len: 256
+  labelintext: True
+training:
+  num_epochs: 2
+  lr: 0.0005
+  weight_decay:  0.0005
+  min_lr: 0.0005
+model:
+  model_dir: "saved_models/Llama3.2-1B"
+  name: "Llama"
+freezer:
+  transformer: 2.
+  embeddings: True
+  pos: True
+  lm_head: True
+  ln_f: True
+seed: 42

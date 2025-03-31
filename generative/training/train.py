@@ -19,7 +19,7 @@ def train_one_epoch(dataloader, model, optimizer, epoch, device, scheduler=None,
     prg: progress
     for i, prg, (text, X, scores, y) in progress(dataloader, type="dl").enum().ref():
         if epoch == 0 and i == 0 and sample_inputs is not None:
-            print()
+
             log(f"Saving sample inputs at {sample_inputs}")
             torch.save((text, X, scores, y), sample_inputs)
         # Setup - Copying to gpu if available
@@ -29,7 +29,7 @@ def train_one_epoch(dataloader, model, optimizer, epoch, device, scheduler=None,
         # Training with possibility of mixed precision
         if scaler:
             with torch.autocast(device_type=str(device), dtype=torch.float16):
-                logits = model(X, scores)
+                logits = model(X)
                 loss = F.cross_entropy(logits.view(-1, logits.size(-1)), y.view(-1), ignore_index=-1)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -153,9 +153,11 @@ def evaluate(model, dataloader, device, metrics: dict = None):
     # Reset metrics
     for m in metrics.values():
         m.reset()
-
+    i = 0
+    
     output_rate = 25 if str(device) == 'cuda' else 1
     for prg, (text, X, scores, y) in progress(dataloader, type="dl", desc="Evaluating", end="\n").ref():
+
         # Setup - Copying to gpu if available
         X, scores, y = X.to(device), scores.to(device).float(), y.to(device)
 
@@ -178,4 +180,4 @@ def evaluate(model, dataloader, device, metrics: dict = None):
         )
 
     # Report epochs metrics
-    return dict(loss=lossCounter.compute(), **{k: v.compute() for k, v in metrics.items()})
+    return dict(loss=lossCounter.compute().item(), **{k: v.compute() for k, v in metrics.items()})
