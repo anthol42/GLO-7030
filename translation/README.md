@@ -26,9 +26,14 @@ Run pipeline with default settings (Japanese intermediate):
 python main.py
 ```
 
-Custom language back-translation (Korean example):
+Single intermediate language back-translation (Korean example):
 ```bash
 python main.py --inter_lang ko
+```
+
+Multiple intermediate languages back-translation (French, German, Spanish, Chinese):
+```bash
+python main.py --inter_lang fr,de,es,zh
 ```
 
 ## Best Languages for Diversity
