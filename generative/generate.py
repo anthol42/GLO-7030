@@ -103,8 +103,5 @@ if __name__ == "__main__":
     model = model.to(device)
     str2complete = ""
     generate_labelintext(model, enc, str2complete, -2, device, b_size, max_length, temperature, log=True)
-<<<<<<< HEAD
     # generate_labelintext(model, str2complete, -0.99, device)
-=======
     # generate_labelintext(model, str2complete, -0.99, device)
->>>>>>> 64043f213960788a24e49a849d7b3c65dde4f2ba

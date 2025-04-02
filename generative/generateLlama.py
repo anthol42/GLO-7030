@@ -103,7 +103,7 @@ if __name__ == "__main__":
 
 
   
-    ckpt_dir = "/home/jacob/.llama/checkpoints/Llama3.2-1B"
+    ckpt_dir = "saved_models/Llama3.2-1B"
     tokenizer_path = "saved_models/Llama3.2-1B/tokenizer.model"
  
   
@@ -131,8 +131,8 @@ if __name__ == "__main__":
    # enc = tiktoken.get_encoding("gpt2")
 
     #model = GPT(config, labelintext=True)
-    #checkpoint = torch.load("saved_models/Llama3.2-1B/3/Llama.pth", map_location="cpu")["model_state_dict"]
-    checkpoint = torch.load("saved_models/Llama3.2-1B/consolidated.00.pth", map_location="cpu")
+    #checkpoint = torch.load("saved_models/Llama3.2-1B/6/Llama.pth", map_location="cpu")["model_state_dict"]
+    checkpoint = torch.load("saved_models/Llama3.2-1B/consolidated.00.pth", map_location="cpu")# ["model_state_dict"]
 
     model = Transformer(model_args)
     
@@ -145,5 +145,5 @@ if __name__ == "__main__":
 
 
     str2complete = ""
-    generate_labelintext(model, enc, str2complete, 0.9, device, b_size, max_length, temperature, log=True)
+    generate_labelintext(model, enc, str2complete, 2., device, b_size, max_length, temperature, log=True)
     # generate_labelintext(model, str2complete, -0.99, device)

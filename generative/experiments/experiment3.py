@@ -38,6 +38,7 @@ def experiment3(args, kwargs):
     device = utils.get_device(args.cpu)
     log(f"Running on {device}")
     hyper = utils.clean_dict(vars(args).copy())
+    hyper.update(kwargs)
 
     DEBUG = args.debug
 
